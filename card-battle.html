@@ -154,6 +154,7 @@
                 <h3>战斗统计</h3>
                 <div class="summary-grid"></div>
             </div>
+            <button id="restartButton" style="display: none; margin-top: 20px; padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">重新开始</button>
         </div>
     </div>
 
@@ -776,6 +777,59 @@
         // 初始化游戏
         renderHeroList();
         console.log(gameState);
+
+        // 重新开始游戏
+        function restartGame() {
+            // 重置游戏状态
+            gameState.playerTeam = [];
+            gameState.computerTeam = [];
+            gameState.currentTurn = 'player';
+            gameState.gameStarted = false;
+
+            // 重置英雄状态（生命值、行动次数、统计数据等）
+            gameState.heroes.forEach(hero => {
+                // 创建新的英雄实例以完全重置状态
+                let newHero;
+                if (hero instanceof AttackHero) newHero = new AttackHero(hero.name);
+                else if (hero instanceof DefenseHero) newHero = new DefenseHero(hero.name);
+                else if (hero instanceof PriestHero) newHero = new PriestHero(hero.name);
+                else if (hero instanceof AssassinHero) newHero = new AssassinHero(hero.name);
+                else if (hero instanceof PaladinHero) newHero = new PaladinHero(hero.name);
+                else if (hero instanceof DruidHero) newHero = new DruidHero(hero.name);
+                
+                // 替换旧的英雄实例
+                const index = gameState.heroes.findIndex(h => h.name === hero.name);
+                if (index !== -1) {
+                    gameState.heroes[index] = newHero;
+                }
+            });
+
+            // 清空战斗日志和战斗场地显示
+            document.getElementById('battleLog').innerHTML = '';
+            document.getElementById('player1').innerHTML = '';
+            document.getElementById('player2').innerHTML = '';
+
+            // 隐藏战斗统计和重新开始按钮
+            document.getElementById('battleSummary').style.display = 'none';
+            document.getElementById('restartButton').style.display = 'none';
+
+            // 显示英雄选择界面
+            document.querySelector('.hero-selection').style.display = 'block';
+
+            // 重新渲染英雄列表
+            renderHeroList();
+        }
+
+        // 在游戏结束时显示重新开始按钮
+        const originalShowBattleSummary = showBattleSummary;
+        showBattleSummary = function() {
+            originalShowBattleSummary.call(this);
+            document.getElementById('restartButton').style.display = 'block';
+        };
+
+        // 为重新开始按钮添加事件监听器
+        document.getElementById('restartButton').addEventListener('click', restartGame);
+
     </script>
 </body>
 </html>
