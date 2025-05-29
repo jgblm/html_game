@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2048 Game</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            color: white;
+            padding: 20px;
+        }
+
+        .game-container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .cell {
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            transition: all 0.2s ease;
+        }
+
+        .cell[data-value="2"] { background: #1abc9c; }
+        .cell[data-value="4"] { background: #2ecc71; }
+        .cell[data-value="8"] { background: #3498db; }
+        .cell[data-value="16"] { background: #9b59b6; }
+        .cell[data-value="32"] { background: #f1c40f; }
+        .cell[data-value="64"] { background: #e67e22; }
+        .cell[data-value="128"] { background: #e74c3c; }
+        .cell[data-value="256"] { background: #16a085; }
+        .cell[data-value="512"] { background: #27ae60; }
+        .cell[data-value="1024"] { background: #2980b9; }
+        .cell[data-value="2048"] { background: #8e44ad; }
+
+        .score {
+            font-size: 24px;
+            margin: 20px 0;
+        }
+
+        .controls {
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        button:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .win-message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(46, 204, 113, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>2048 Game</h1>
+    <div class="score">Score: <span id="score">0</span></div>
+    
+    <div class="game-container">
+        <div class="grid" id="grid"></div>
+    </div>
+
+    <div class="controls">
+        <button onclick="resetGame()">New Game</button>
+    </div>
+
+    <div class="win-message" id="winMessage">
+        <h2>Congratulations! 🎉</h2>
+        <p>You've reached 2048!</p>
+        <button onclick="resetGame()">Play Again</button>
+    </div>
+
+    <script>
+        const grid = document.getElementById('grid');
+        const scoreDisplay = document.getElementById('score');
+        const winMessage = document.getElementById('winMessage');
+        let score = 0;
+        let cells = [];
+        let gameBoard = Array(16).fill(0);
+
+        function initializeGame() {
+            grid.innerHTML = '';
+            for (let i = 0; i < 16; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                grid.appendChild(cell);
+                cells.push(cell);
+            }
+            gameBoard = Array(16).fill(0);
+            score = 0;
+            scoreDisplay.textContent = score;
+            addNewNumber();
+            addNewNumber();
+            updateDisplay();
+        }
+
+        function updateDisplay() {
+            for (let i = 0; i < 16; i++) {
+                cells[i].textContent = gameBoard[i] || '';
+                cells[i].setAttribute('data-value', gameBoard[i]);
+            }
+            scoreDisplay.textContent = score;
+        }
+
+        function addNewNumber() {
+            const emptyCells = gameBoard.reduce((acc, curr, idx) => {
+                if (curr === 0) acc.push(idx);
+                return acc;
+            }, []);
+
+            if (emptyCells.length > 0) {
+                const randomCell = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+                gameBoard[randomCell] = Math.random() < 0.9 ? 2 : 4;
+            }
+        }
+
+        function move(direction) {
+            let moved = false;
+            const lines = [];
+
+            // Extract lines based on direction
+            if (direction === 'left' || direction === 'right') {
+                for (let i = 0; i < 4; i++) {
+                    lines.push(gameBoard.slice(i * 4, (i + 1) * 4));
+                }
+            } else {
+                for (let i = 0; i < 4; i++) {
+                    lines.push([gameBoard[i], gameBoard[i + 4], gameBoard[i + 8], gameBoard[i + 12]]);
+                }
+            }
+
+            // Process each line
+            lines.forEach((line, lineIndex) => {
+                if (direction === 'right' || direction === 'down') {
+                    line.reverse();
+                }
+
+                // Merge numbers
+                const merged = mergeLine(line);
+                moved = moved || merged.moved;
+                score += merged.score;
+
+                if (direction === 'right' || direction === 'down') {
+                    merged.line.reverse();
+                }
+
+                // Update game board
+                if (direction === 'left' || direction === 'right') {
+                    for (let i = 0; i < 4; i++) {
+                        gameBoard[lineIndex * 4 + i] = merged.line[i];
+                    }
+                } else {
+                    for (let i = 0; i < 4; i++) {
+                        gameBoard[lineIndex + i * 4] = merged.line[i];
+                    }
+                }
+            });
+
+            if (moved) {
+                addNewNumber();
+                updateDisplay();
+                checkWin();
+            }
+        }
+
+        function mergeLine(line) {
+            let moved = false;
+            let score = 0;
+            const newLine = line.filter(x => x !== 0);
+
+            for (let i = 0; i < newLine.length - 1; i++) {
+                if (newLine[i] === newLine[i + 1]) {
+                    newLine[i] *= 2;
+                    score += newLine[i];
+                    newLine.splice(i + 1, 1);
+                    moved = true;
+                }
+            }
+
+            while (newLine.length < 4) {
+                newLine.push(0);
+            }
+
+            moved = moved || line.some((val, idx) => val !== newLine[idx]);
+            return { line: newLine, moved, score };
+        }
+
+        function checkWin() {
+            if (gameBoard.includes(2048)) {
+                winMessage.style.display = 'block';
+            }
+        }
+
+        function resetGame() {
+            winMessage.style.display = 'none';
+            initializeGame();
+        }
+
+        document.addEventListener('keydown', (e) => {
+            switch(e.key) {
+                case 'ArrowLeft':
+                    move('left');
+                    break;
+                case 'ArrowRight':
+                    move('right');
+                    break;
+                case 'ArrowUp':
+                    move('up');
+                    break;
+                case 'ArrowDown':
+                    move('down');
+                    break;
+            }
+        });
+
+        // Touch controls
+        let touchStartX, touchStartY;
+
+        document.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        });
+
+        document.addEventListener('touchend', (e) => {
+            if (!touchStartX || !touchStartY) return;
+
+            const touchEndX = e.changedTouches[0].clientX;
+            const touchEndY = e.changedTouches[0].clientY;
+
+            const deltaX = touchEndX - touchStartX;
+            const deltaY = touchEndY - touchStartY;
+
+            if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                if (deltaX > 0) move('right');
+                else move('left');
+            } else {
+                if (deltaY > 0) move('down');
+                else move('up');
+            }
+
+            touchStartX = null;
+            touchStartY = null;
+        });
+
+        initializeGame();
+    </script>
+</body>
+</html>

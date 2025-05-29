@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>卡牌战斗游戏</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .game-container {
+            display: flex;
+            justify-content: space-between;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .hero-selection {
+            width: 300px;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .battle-field {
+            flex-grow: 1;
+            margin: 0 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .hero-card {
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .hero-card.dead {
+            opacity: 0.5;
+            background-color: #f5f5f5;
+            border-color: #999;
+        }
+        .hero-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .hero-card.selected {
+            border-color: #4CAF50;
+            background-color: #E8F5E9;
+        }
+        .battle-hero {
+            display: flex;
+            justify-content: space-between;
+            margin: 20px 0;
+            gap: 20px;
+        }
+        .hero-stats {
+            margin-top: 10px;
+            font-size: 14px;
+        }
+        .skill-button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            margin-top: 5px;
+        }
+        .skill-button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .battle-log {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f8f8f8;
+            border-radius: 5px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .type-attack { background-color: #ffebee; }
+        .type-defense { background-color: #e3f2fd; }
+        .type-heal { background-color: #e8f5e9; }
+
+        .battle-summary {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #fff;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .battle-summary h3 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 10px;
+        }
+
+        .summary-card {
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+
+        .summary-card h4 {
+            margin: 0 0 10px 0;
+            color: #444;
+        }
+
+        .summary-stat {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            font-size: 14px;
+        }
+
+        .hero-selection {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="hero-selection">
+            <h2>选择英雄</h2>
+            <div id="heroList"></div>
+        </div>
+        <div class="battle-field">
+            <h2>战斗场地</h2>
+            <div class="battle-hero">
+                <div id="player1" class="hero-stats"></div>
+                <div id="player2" class="hero-stats"></div>
+            </div>
+            <div id="battleControls"></div>
+            <div id="battleLog" class="battle-log"></div>
+            <div id="battleSummary" class="battle-summary" style="display: none;">
+                <h3>战斗统计</h3>
+                <div class="summary-grid"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 英雄基类
+        class Hero {
+            constructor(name, type, hp, attack, defense, speed) {
+                this.name = name;
+                this.type = type;
+                this.maxHp = hp;
+                this.hp = hp;
+                this.attack = attack;
+                this.defense = defense;
+                this.speed = speed;
+                this.isAlive = true;
+                this.actionCount = 0;
+                // 战斗属性
+                this.critRate = 0.2;     // 暴击率
+                this.critDamage = 1.5;   // 暴击伤害
+                this.dodgeRate = 0.1;    // 闪避率
+                // 战斗统计数据
+                this.totalDamageDealt = 0;
+                this.totalDamageTaken = 0;
+                this.totalHealing = 0;
+                this.critCount = 0;      // 暴击次数
+                this.dodgeCount = 0;     // 闪避次数
+            }
+
+            // 基础攻击
+            basicAttack(target) {
+                // 检查闪避
+                if (Math.random() < target.dodgeRate) {
+                    target.dodgeCount++;
+                    return `${target.name} 闪避了 ${this.name} 的攻击`;
+                }
+
+                // 计算伤害
+                let damage = Math.max(1, this.attack - target.defense);
+                let isCrit = Math.random() < this.critRate;
+                
+                // 暴击伤害
+                if (isCrit) {
+                    damage = Math.floor(damage * this.critDamage);
+                    this.critCount++;
+                }
+
+                target.hp = Math.max(0, target.hp - damage);
+                target.isAlive = target.hp > 0;
+                this.totalDamageDealt += damage;
+                target.totalDamageTaken += damage;
+
+                return `${this.name} 对 ${target.name} 造成 ${damage} 点伤害${isCrit ? '（暴击）' : ''}`;
+            }
+
+            // 主动技能（由子类实现）
+            activeSkill(target) {}
+
+            // 被动技能（由子类实现）
+            passiveSkill() {}
+        }
+
+        // 攻击型英雄
+        class AttackHero extends Hero {
+            constructor(name) {
+                super(name, 'attack', 100, 30, 10, 15);
+                this.critRate = 0.3;     // 攻击型英雄有更高的暴击率
+                this.critDamage = 2.0;   // 更高的暴击伤害
+            }
+
+            activeSkill(target) {
+                // 检查闪避（技能闪避率降低）
+                if (Math.random() < target.dodgeRate * 0.5) {
+                    target.dodgeCount++;
+                    return `${target.name} 闪避了 ${this.name} 的技能`;
+                }
+
+                // 计算伤害（技能必定暴击）
+                let damage = Math.max(1, this.attack * 1.5 - target.defense);
+                damage = Math.floor(damage * this.critDamage);
+                this.critCount++;
+
+                target.hp = Math.max(0, target.hp - damage);
+                target.isAlive = target.hp > 0;
+                this.totalDamageDealt += damage;
+                target.totalDamageTaken += damage;
+
+                return `${this.name} 使用暴击技能，对 ${target.name} 造成 ${damage} 点伤害`;
+            }
+
+            passiveSkill() {
+                const hpPercent = this.hp / this.maxHp;
+                const attackBonus = Math.floor((1 - hpPercent) * 20); // 生命值越低，攻击加成越高，最高+20
+                this.attack += attackBonus;
+                return `${this.name} 的生命值降低，攻击力提升${attackBonus}点`;
+            }
+        }
+
+        // 防御型英雄
+        class DefenseHero extends Hero {
+
+            activeSkill(target) {
+                this.defense += 5;
+                return `${this.name} 强化防御，防御力提升5点`;
+            }
+
+            constructor(name) {
+                super(name, 'defense', 150, 15, 20, 10);
+                this.dodgeRate = 0.15;   // 防御型英雄有更高的闪避率
+                this.critDamage = 1.3;   // 较低的暴击伤害
+                this.stunChance = 0.2;   // 眩晕概率
+                this.targetStunned = null; // 被眩晕的目标
+            }
+
+            basicAttack(target) {
+                const message = super.basicAttack(target);
+                if (Math.random() < this.stunChance && target.isAlive) {
+                    this.targetStunned = target;
+                    return message + `\n${target.name} 被眩晕了！`;
+                }
+                return message;
+            }
+
+            passiveSkill() {
+                if (this.targetStunned) {
+                    const stunMessage = `${this.targetStunned.name} 处于眩晕状态，无法行动`;
+                    this.targetStunned = null; // 眩晕效果结束
+                    return stunMessage;
+                }
+                return '';
+            }
+        }
+
+        // 刺客英雄
+        class AssassinHero extends Hero {
+            constructor(name) {
+                super(name, 'attack', 90, 35, 8, 18);
+                this.critRate = 0.25;     // 刺客基础暴击率
+                this.critDamage = 1.8;    // 刺客基础暴击伤害
+                this.dodgeRate = 0.15;    // 较高的闪避率
+                this.critRateBonus = 0;   // 暴击率加成
+                this.critDamageBonus = 0; // 暴击伤害加成
+            }
+
+            basicAttack(target) {
+                const message = super.basicAttack(target);
+                // 如果这次攻击没有暴击，增加暴击属性
+                if (!message.includes('暴击')) {
+                    this.critRateBonus += 0.05;
+                    this.critDamageBonus += 0.15;
+                    this.critRate = Math.min(0.8, 0.25 + this.critRateBonus);
+                    this.critDamage = 1.8 + this.critDamageBonus;
+                    return message + `\n${this.name} 的暴击率提升5%，暴击伤害提升15%`;
+                } else {
+                    // 暴击后重置加成
+                    this.critRateBonus = 0;
+                    this.critDamageBonus = 0;
+                    this.critRate = 0.25;
+                    this.critDamage = 1.8;
+                }
+                return message;
+            }
+
+            passiveSkill() {
+                return '';
+            }
+        }
+
+        // 牧师英雄
+        class PriestHero extends Hero {
+            constructor(name) {
+                super(name, 'heal', 80, 10, 8, 12);
+                this.critRate = 0.15;    // 治疗型英雄有较低的暴击率
+                this.dodgeRate = 0.12;   // 中等闪避率
+                this.skillChargeNeeded = 3; // 需要的攻击次数
+            }
+
+            activeSkill(target) {
+                const heal = 20;
+                target.hp = Math.min(target.maxHp, target.hp + heal);
+                this.totalHealing += heal;
+                return `${this.name} 治疗 ${target.name}，恢复 ${heal} 点生命值`;
+            }
+
+            // 被攻击时减少技能所需次数
+            takeDamage() {
+                this.skillChargeNeeded = Math.max(1, this.skillChargeNeeded - 1);
+                return `${this.name} 的技能充能加快！`;
+            }
+
+            passiveSkill() {
+                return '';
+            }
+        }
+
+        // 圣骑士英雄
+        class PaladinHero extends Hero {
+            constructor(name) {
+                super(name, 'defense', 130, 18, 15, 11);
+                this.healChance = 0.3;    // 治疗触发概率
+                this.healAmount = 10;     // 固定治疗量
+            }
+
+            basicAttack(target) {
+                const message = super.basicAttack(target);
+                if (Math.random() < this.healChance) {
+                    const heal = this.healAmount;
+                    this.hp = Math.min(this.maxHp, this.hp + heal);
+                    this.totalHealing += heal;
+                    return message + `\n${this.name} 触发治疗，恢复 ${heal} 点生命值`;
+                }
+                return message;
+            }
+
+            passiveSkill() {
+                return '';
+            }
+        }
+
+        // 德鲁伊英雄
+        class DruidHero extends Hero {
+            constructor(name) {
+                super(name, 'heal', 100, 15, 12, 13);
+                this.transformed = false;
+            }
+
+            passiveSkill() {
+                if (this.hp < this.maxHp * 0.5 && !this.transformed) {
+                    this.transformed = true;
+                    this.maxHp *= 2;
+                    this.hp = this.maxHp;
+                    this.attack = Math.floor(this.attack * 1.5);
+                    return `${this.name} 进入狂暴状态，生命值翻倍，攻击提升50%！`;
+                }
+                return '';
+            }
+        }
+
+        // 游戏状态
+        const gameState = {
+            heroes: [
+                new AttackHero('狂战士'),
+                new DefenseHero('守护者'),
+                new PriestHero('牧师'),
+                new AssassinHero('刺客'),
+                new PaladinHero('圣骑士'),
+                new DruidHero('德鲁伊')
+            ],
+            playerTeam: [],
+            computerTeam: [],
+            currentTurn: 'player',
+            gameStarted: false
+        };
+
+        // 获取生命值百分比最低的英雄
+        function getLowestHpHero(team) {
+            return team.reduce((lowest, hero) => {
+                if (!hero.isAlive) return lowest;
+                const lowestHpPercent = lowest ? lowest.hp / lowest.maxHp : 1;
+                const currentHpPercent = hero.hp / hero.maxHp;
+                return currentHpPercent < lowestHpPercent ? hero : lowest;
+            }, null);
+        }
+
+        // 获取随机存活目标
+        function getRandomTarget(team) {
+            const aliveHeroes = team.filter(hero => hero.isAlive);
+            return aliveHeroes[Math.floor(Math.random() * aliveHeroes.length)];
+        }
+
+        // 渲染英雄列表
+        function renderHeroList() {
+            const heroList = document.getElementById('heroList');
+            heroList.innerHTML = gameState.heroes.map(hero => `
+                <div class="hero-card ${hero.type}-type" onclick="selectHero('${hero.name}')">
+                    <h3>${hero.name}</h3>
+                    <div class="hero-stats">
+                        生命: ${hero.hp}/${hero.maxHp}<br>
+                        攻击: ${hero.attack}<br>
+                        防御: ${hero.defense}<br>
+                        速度: ${hero.speed}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 选择英雄
+        function selectHero(name) {
+            if (gameState.gameStarted) return;
+            const selectedHero = gameState.heroes.find(h => h.name === name);
+            
+            if (gameState.playerTeam.length < 3 && !gameState.playerTeam.includes(selectedHero)) {
+                gameState.playerTeam.push(selectedHero);
+                
+                if (gameState.playerTeam.length === 3) {
+                    // 随机选择电脑英雄
+                    const availableHeroes = gameState.heroes.filter(h => !gameState.playerTeam.includes(h));
+                    for (let i = 0; i < 3; i++) {
+                        const randomIndex = Math.floor(Math.random() * availableHeroes.length);
+                        gameState.computerTeam.push(availableHeroes[randomIndex]);
+                        availableHeroes.splice(randomIndex, 1);
+                    }
+                    gameState.gameStarted = true;
+                    renderBattleField();
+                    // 开始自动战斗
+                    autoBattle();
+                } else {
+                    renderBattleField();
+                }
+            }
+        }
+
+        // 自动战斗
+        function autoBattle() {
+            if (!gameState.gameStarted) return;
+
+            // 玩家回合
+            for (const hero of gameState.playerTeam) {
+                if (!hero.isAlive) continue;
+                
+                // 检查是否被眩晕
+                if (hero.constructor === DefenseHero && hero.targetStunned) {
+                    addBattleLog(hero.passiveSkill());
+                    continue;
+                }
+                
+                hero.actionCount++;
+                let message = '';
+                
+                // 触发被动技能
+                const passiveMessage = hero.passiveSkill();
+                if (passiveMessage) {
+                    addBattleLog(passiveMessage);
+                }
+                
+                if (hero instanceof PriestHero && hero.actionCount >= hero.skillChargeNeeded) {
+                    const target = getLowestHpHero(gameState.playerTeam);
+                    if (target) {
+                        message = hero.activeSkill(target);
+                    }
+                    hero.actionCount = 0;
+                } else if (hero.actionCount >= 3) {
+                    if (hero.type === 'heal') {
+                        const target = getLowestHpHero(gameState.playerTeam);
+                        if (target) {
+                            message = hero.activeSkill(target);
+                        }
+                    } else {
+                        const target = getRandomTarget(gameState.computerTeam);
+                        if (target) {
+                            message = hero.activeSkill(target);
+                        }
+                    }
+                    hero.actionCount = 0;
+                } else {
+                    const target = getRandomTarget(gameState.computerTeam);
+                    if (target) {
+                        message = hero.basicAttack(target);
+                        // 如果目标被攻击且是牧师，触发被动
+                        if (target instanceof PriestHero) {
+                            addBattleLog(target.takeDamage());
+                        }
+                    }
+                }
+
+                if (message) {
+                    addBattleLog(message);
+                    const passiveMessage = hero.passiveSkill();
+                    addBattleLog(passiveMessage);
+                }
+
+                renderBattleField();
+                
+                // 检查游戏是否结束
+                if (gameState.computerTeam.every(h => !h.isAlive)) {
+                    addBattleLog('游戏结束！你获胜了！');
+                    gameState.gameStarted = false;
+                    showBattleSummary();
+                    return;
+                }
+            }
+
+            // 电脑回合
+            for (const hero of gameState.computerTeam) {
+                if (!hero.isAlive) continue;
+
+                hero.actionCount++;
+                let message = '';
+
+                if (hero.actionCount >= 3) {
+                    if (hero.type === 'heal') {
+                        const target = getLowestHpHero(gameState.computerTeam);
+                        if (target) {
+                            message = hero.activeSkill(target);
+                        }
+                    } else {
+                        const target = getRandomTarget(gameState.playerTeam);
+                        if (target) {
+                            message = hero.activeSkill(target);
+                        }
+                    }
+                    hero.actionCount = 0;
+                } else {
+                    const target = getRandomTarget(gameState.playerTeam);
+                    if (target) {
+                        message = hero.basicAttack(target);
+                    }
+                }
+
+                if (message) {
+                    addBattleLog(message);
+                    const passiveMessage = hero.passiveSkill();
+                    addBattleLog(passiveMessage);
+                }
+
+                renderBattleField();
+
+                // 检查游戏是否结束
+                if (gameState.playerTeam.every(h => !h.isAlive)) {
+                    addBattleLog('游戏结束！电脑获胜！');
+                    gameState.gameStarted = false;
+                    showBattleSummary();
+                    return;
+                }
+            }
+
+            // 如果游戏未结束，继续下一轮战斗
+            if (gameState.gameStarted) {
+                setTimeout(autoBattle, 1000);
+            }
+        }
+
+        // 渲染战斗场地
+        function renderBattleField() {
+            // 渲染玩家英雄
+            document.getElementById('player1').innerHTML = gameState.playerTeam.map(hero => `
+                <div class="hero-card ${hero.type}-type ${!hero.isAlive ? 'dead' : ''}">
+                    <h3>${hero.name}</h3>
+                    生命: ${hero.hp}/${hero.maxHp}<br>
+                    攻击: ${hero.attack}<br>
+                    防御: ${hero.defense}<br>
+                    速度: ${hero.speed}<br>
+                    暴击率: ${Math.floor(hero.critRate * 100)}%<br>
+                    暴击伤害: ${hero.critDamage}x<br>
+                    闪避率: ${Math.floor(hero.dodgeRate * 100)}%<br>
+                    行动次数: ${hero.actionCount}/3
+                </div>
+            `).join('');
+
+            // 渲染电脑英雄
+            document.getElementById('player2').innerHTML = gameState.computerTeam.map(hero => `
+                <div class="hero-card ${hero.type}-type ${!hero.isAlive ? 'dead' : ''}">
+                    <h3>${hero.name}</h3>
+                    生命: ${hero.hp}/${hero.maxHp}<br>
+                    攻击: ${hero.attack}<br>
+                    防御: ${hero.defense}<br>
+                    速度: ${hero.speed}<br>
+                    暴击率: ${Math.floor(hero.critRate * 100)}%<br>
+                    暴击伤害: ${hero.critDamage}x<br>
+                    闪避率: ${Math.floor(hero.dodgeRate * 100)}%<br>
+                    行动次数: ${hero.actionCount}/3
+                </div>
+            `).join('');
+        }
+
+        // 添加战斗日志
+        function addBattleLog(message) {
+            const battleLog = document.getElementById('battleLog');
+            battleLog.innerHTML += `<div>${message}</div>`;
+            battleLog.scrollTop = battleLog.scrollHeight;
+        }
+
+        // 玩家行动
+        function playerAction(type, heroName) {
+            if (gameState.currentTurn !== 'player') return;
+
+            const activeHero = gameState.playerTeam.find(h => h.name === heroName);
+            if (!activeHero || !activeHero.isAlive) return;
+
+            let message = '';
+            activeHero.actionCount++;
+            
+            if (type === 'attack') {
+                const target = getRandomTarget(gameState.computerTeam);
+                if (target) {
+                    message = activeHero.basicAttack(target);
+                }
+            } else if (type === 'skill') {
+                if (activeHero.actionCount >= 3) {
+                    if (activeHero.type === 'heal') {
+                        const target = getLowestHpHero(gameState.playerTeam);
+                        if (target) {
+                            message = activeHero.activeSkill(target);
+                        }
+                    } else {
+                        const target = getRandomTarget(gameState.computerTeam);
+                        if (target) {
+                            message = activeHero.activeSkill(target);
+                        }
+                    }
+                    activeHero.actionCount = 0;
+                } else {
+                    message = '技能冷却中，还需要' + (3 - activeHero.actionCount) + '回合';
+                    return;
+                }
+            }
+
+            if (message) {
+                addBattleLog(message);
+                const passiveMessage = activeHero.passiveSkill();
+                addBattleLog(passiveMessage);
+            }
+
+            // 检查是否所有电脑英雄都阵亡
+            if (gameState.computerTeam.every(hero => !hero.isAlive)) {
+                addBattleLog('游戏结束！你获胜了！');
+                gameState.gameStarted = false;
+                renderBattleField();
+                return;
+            }
+
+            gameState.currentTurn = 'computer';
+            renderBattleField();
+            setTimeout(computerAction, 1000);
+        }
+
+        // 电脑行动
+        function computerAction() {
+            if (gameState.currentTurn !== 'computer') return;
+
+            for (const activeHero of gameState.computerTeam) {
+                if (!activeHero.isAlive) continue;
+
+                let message = '';
+                activeHero.actionCount++;
+
+                if (activeHero.actionCount >= 3) {
+                    if (activeHero.type === 'heal') {
+                        const target = getLowestHpHero(gameState.computerTeam);
+                        if (target) {
+                            message = activeHero.activeSkill(target);
+                        }
+                    } else {
+                        const target = getRandomTarget(gameState.playerTeam);
+                        if (target) {
+                            message = activeHero.activeSkill(target);
+                        }
+                    }
+                    activeHero.actionCount = 0;
+                } else {
+                    const target = getRandomTarget(gameState.playerTeam);
+                    if (target) {
+                        message = activeHero.basicAttack(target);
+                    }
+                }
+
+                if (message) {
+                    addBattleLog(message);
+                    const passiveMessage = activeHero.passiveSkill();
+                    addBattleLog(passiveMessage);
+                }
+
+                renderBattleField();
+
+                // 检查是否所有玩家英雄都阵亡
+                if (gameState.playerTeam.every(hero => !hero.isAlive)) {
+                    addBattleLog('游戏结束！电脑获胜！');
+                    gameState.gameStarted = false;
+                    renderBattleField();
+                    return;
+                }
+            }
+
+            gameState.currentTurn = 'player';
+            renderBattleField();
+        }
+
+        // 显示战斗统计
+        function showBattleSummary() {
+            const summaryDiv = document.getElementById('battleSummary');
+            const summaryGrid = summaryDiv.querySelector('.summary-grid');
+            summaryDiv.style.display = 'block';
+
+            // 合并双方英雄进行统计显示
+            const allHeroes = [...gameState.playerTeam, ...gameState.computerTeam];
+            summaryGrid.innerHTML = allHeroes.map(hero => `
+                <div class="summary-card ${hero.type}-type">
+                    <h4>${hero.name}</h4>
+                    <div class="summary-stat">
+                        <span>造成伤害：</span>
+                        <span>${hero.totalDamageDealt}</span>
+                    </div>
+                    <div class="summary-stat">
+                        <span>承受伤害：</span>
+                        <span>${hero.totalDamageTaken}</span>
+                    </div>
+                    <div class="summary-stat">
+                        <span>治疗量：</span>
+                        <span>${hero.totalHealing}</span>
+                    </div>
+                    <div class="summary-stat">
+                        <span>暴击次数：</span>
+                        <span>${hero.critCount}</span>
+                    </div>
+                    <div class="summary-stat">
+                        <span>闪避次数：</span>
+                        <span>${hero.dodgeCount}</span>
+                    </div>
+                    <div class="summary-stat">
+                        <span>暴击率：</span>
+                        <span>${Math.floor(hero.critRate * 100)}%</span>
+                    </div>
+                    <div class="summary-stat">
+                        <span>闪避率：</span>
+                        <span>${Math.floor(hero.dodgeRate * 100)}%</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 初始化游戏
+        renderHeroList();
+        console.log(gameState);
+    </script>
+</body>
+</html>
