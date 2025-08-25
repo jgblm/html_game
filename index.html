@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>游戏集合</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        
+        .games-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 30px;
+            max-width: 1200px;
+        }
+        
+        .game-card {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            width: 300px;
+            text-align: center;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+        
+        .game-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+            background: rgba(255, 255, 255, 0.25);
+        }
+        
+        .game-icon {
+            font-size: 3rem;
+            margin-bottom: 20px;
+        }
+        
+        .game-title {
+            font-size: 1.8rem;
+            margin-bottom: 15px;
+        }
+        
+        .game-description {
+            margin-bottom: 20px;
+            line-height: 1.5;
+            min-height: 80px;
+        }
+        
+        .play-button {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid white;
+            padding: 12px 30px;
+            font-size: 1.1rem;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .play-button:hover {
+            background: white;
+            color: #2a5298;
+            transform: scale(1.05);
+        }
+        
+        .footer {
+            margin-top: 50px;
+            text-align: center;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>游戏集合</h1>
+        <div class="subtitle">三个经典小游戏，随时随地享受游戏乐趣</div>
+    </div>
+    
+    <div class="games-container">
+        <div class="game-card">
+            <div class="game-icon">2048</div>
+            <h2 class="game-title">2048</h2>
+            <div class="game-description">
+                经典的数字合并游戏。通过滑动方块来合并相同的数字，目标是创建2048方块！
+            </div>
+            <a href="2048.html" class="play-button">开始游戏</a>
+        </div>
+        
+        <div class="game-card">
+            <div class="game-icon">⚔️</div>
+            <h2 class="game-title">卡牌战斗</h2>
+            <div class="game-description">
+                选择你的英雄，与电脑进行自动战斗。多种英雄职业和技能组合等你来体验！
+            </div>
+            <a href="card-battle.html" class="play-button">开始游戏</a>
+        </div>
+        
+        <div class="game-card">
+            <div class="game-icon">🔢</div>
+            <h2 class="game-title">数独</h2>
+            <div class="game-description">
+                经典数独游戏，支持多种难度选择。填写数字完成谜题，并可验证答案正确性。
+            </div>
+            <a href="sudoku.html" class="play-button">开始游戏</a>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <p>享受游戏时光！</p>
+    </div>
+</body>
+</html>
